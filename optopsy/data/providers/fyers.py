@@ -19,7 +19,7 @@ from .base import DataProvider
 _log = logging.getLogger(__name__)
 
 _FYERS_DATA_URL = "https://api-t1.fyers.in/data"
-_OPTIONS_CHAIN_URL = f"{_FYERS_DATA_URL}/options-chain"
+_OPTIONS_CHAIN_URL = f"{_FYERS_DATA_URL}/options-chain-v3"
 _QUOTES_URL = f"{_FYERS_DATA_URL}/quotes"
 _HISTORY_URL = f"{_FYERS_DATA_URL}/history"
 
