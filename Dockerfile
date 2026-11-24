@@ -24,17 +24,22 @@ RUN uv sync --frozen --extra ui --no-dev
 # ---------------------------------------------------------------------------
 FROM python:3.13-slim
 
-WORKDIR /app
+# Create non-root user with UID 1000 (required for Hugging Face Spaces & security)
+RUN useradd -m -u 1000 user
 
-# Copy the entire virtualenv + project from the builder.
-COPY --from=builder /app /app
+WORKDIR /home/user/app
 
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1
+# Copy the entire virtualenv + project from the builder with non-root ownership.
+COPY --chown=user:user --from=builder /app /home/user/app
 
-# Container platforms (Northflank, Railway) or local Docker runs.
-ENV PORT=8000
+USER user
 
-EXPOSE 8000
+ENV HOME=/home/user \
+    PATH="/home/user/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PORT=7860
+
+# Port 7860 is default for Hugging Face Spaces (supports PORT env override)
+EXPOSE 7860
 
 CMD optopsy-chat run --host 0.0.0.0 --port ${PORT} --headless

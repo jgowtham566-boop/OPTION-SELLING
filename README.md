@@ -1,3 +1,13 @@
+---
+title: Option Selling AI
+emoji: 📈
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fgoldspanlabs%2Foptopsy&label=Visitors&icon=suitcase-lg&color=%239ec5fe&message=&style=flat&tz=Canada%2FEastern)
 ![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgoldspanlabs.github.io%2Foptopsy%2F&label=Docs&icon=github&color=%23d2f4ea&message=&style=flat&tz=Canada%2FEastern)
 [![CI](https://github.com/goldspanlabs/optopsy/actions/workflows/ci.yml/badge.svg)](https://github.com/goldspanlabs/optopsy/actions/workflows/ci.yml)
