@@ -9,7 +9,7 @@ FROM python:3.13-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /usr/local/bin/uv
 
-WORKDIR /app
+WORKDIR /home/user/app
 
 # Install dependencies first (layer cache optimisation).
 COPY pyproject.toml uv.lock ./
@@ -30,7 +30,10 @@ RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 
 # Copy the entire virtualenv + project from the builder with non-root ownership.
-COPY --chown=user:user --from=builder /app /home/user/app
+COPY --chown=user:user --from=builder /home/user/app /home/user/app
+
+# Symlink /app to /home/user/app for backwards compatibility
+RUN ln -s /home/user/app /app
 
 USER user
 
@@ -42,4 +45,4 @@ ENV HOME=/home/user \
 # Port 7860 is default for Hugging Face Spaces (supports PORT env override)
 EXPOSE 7860
 
-CMD optopsy-chat run --host 0.0.0.0 --port ${PORT} --headless
+CMD ["sh", "-c", "exec /home/user/app/.venv/bin/optopsy-chat run --host 0.0.0.0 --port ${PORT:-8000} --headless"]
