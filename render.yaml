@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: option-selling
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPTOPSY_MODEL
+        value: anthropic/claude-haiku-4-5-20251001
+      - key: EODHD_API_KEY
+        sync: false
