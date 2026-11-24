@@ -52,6 +52,17 @@ from optopsy.ui.providers import get_provider_names
 from optopsy.ui.storage import STORAGE_ROUTE_PREFIX, LocalStorageClient
 from optopsy.ui.tools._helpers import _df_to_markdown
 
+def _resolve_model() -> str:
+    """Resolve the default model based on available environment API keys."""
+    if os.environ.get("OPTOPSY_MODEL"):
+        return os.environ["OPTOPSY_MODEL"]
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return "gemini/gemini-2.0-flash"
+    if os.environ.get("OPENAI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
+        return "gpt-4o-mini"
+    return "anthropic/claude-haiku-4-5-20251001"
+
+
 _DEFAULT_MODEL = "anthropic/claude-haiku-4-5-20251001"
 
 _RESULT_TOOLS = frozenset({"run_strategy", "scan_strategies"})
@@ -59,7 +70,7 @@ _RESULT_TOOLS = frozenset({"run_strategy", "scan_strategies"})
 
 def _create_agent() -> OptopsyAgent:
     """Create an OptopsyAgent with the configured model."""
-    model = os.environ.get("OPTOPSY_MODEL", _DEFAULT_MODEL)
+    model = _resolve_model()
     return OptopsyAgent(model=model)
 
 
@@ -388,7 +399,7 @@ async def set_starters():
 
 @cl.on_chat_start
 async def on_chat_start():
-    model = os.environ.get("OPTOPSY_MODEL", _DEFAULT_MODEL)
+    model = _resolve_model()
     agent = _create_agent()
     cl.user_session.set("agent", agent)
     cl.user_session.set("messages", [])
