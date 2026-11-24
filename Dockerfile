@@ -32,9 +32,9 @@ COPY --from=builder /app /app
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
-# Railway injects PORT; default to 8000 for local Docker runs.
+# Container platforms (Northflank, Railway) or local Docker runs.
 ENV PORT=8000
 
-EXPOSE ${PORT}
+EXPOSE 8000
 
 CMD optopsy-chat run --host 0.0.0.0 --port ${PORT} --headless
