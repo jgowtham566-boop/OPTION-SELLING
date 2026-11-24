@@ -34,6 +34,13 @@ def _load_providers() -> list[DataProvider]:
         except ImportError:
             pass
 
+        try:
+            from .fyers import FyersProvider
+
+            providers.append(FyersProvider())
+        except ImportError:
+            pass
+
         # Discover plugin providers
         try:
             from optopsy.plugins import get_plugin_providers

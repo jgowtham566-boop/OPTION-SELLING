@@ -18,3 +18,7 @@ services:
         value: anthropic/claude-haiku-4-5-20251001
       - key: EODHD_API_KEY
         sync: false
+      - key: FYERS_APP_ID
+        sync: false
+      - key: FYERS_ACCESS_TOKEN
+        sync: false
