@@ -57,7 +57,7 @@ def _resolve_model() -> str:
     if os.environ.get("OPTOPSY_MODEL"):
         return os.environ["OPTOPSY_MODEL"]
     if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-        return "gemini/gemini-2.0-flash"
+        return "gemini/gemini-3.8-flash"
     if os.environ.get("OPENAI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
         return "gpt-4o-mini"
     return "anthropic/claude-haiku-4-5-20251001"
