@@ -38,6 +38,9 @@ logging.basicConfig(
 _env_path = find_dotenv() or str(Path(__file__).resolve().parent.parent.parent / ".env")
 load_dotenv(_env_path, override=True)
 
+# Ensure a stable authentication secret across container restarts/deploys
+os.environ.setdefault("CHAINLIT_AUTH_SECRET", "optopsy-stable-auth-secret-key-2026")
+
 import chainlit as cl
 import pandas as pd
 from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
