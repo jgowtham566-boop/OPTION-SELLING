@@ -17,7 +17,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: OPTOPSY_MODEL
-        value: anthropic/claude-haiku-4-5-20251001
+        value: gemini/gemini-3.8-flash
       - key: EODHD_API_KEY
         sync: false
       - key: FYERS_APP_ID

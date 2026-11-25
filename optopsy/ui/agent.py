@@ -502,6 +502,9 @@ class OptopsyAgent:
     """
 
     def __init__(self, model: str = "anthropic/claude-haiku-4-5-20251001"):
+        # Auto-upgrade any deprecated gemini-2.0 reference to gemini-3.8-flash
+        if "gemini-2.0" in model:
+            model = "gemini/gemini-3.8-flash"
         self.model = model
         self.tools = get_tool_schemas()
         # Cache tool schemas as a prefix on Anthropic models — add cache_control

@@ -54,8 +54,16 @@ from optopsy.ui.tools._helpers import _df_to_markdown
 
 def _resolve_model() -> str:
     """Resolve the default model based on available environment API keys."""
-    if os.environ.get("OPTOPSY_MODEL"):
-        return os.environ["OPTOPSY_MODEL"]
+    model = os.environ.get("OPTOPSY_MODEL")
+    if model:
+        # Automatically upgrade deprecated gemini-2.0 models to gemini-3.8-flash
+        if "gemini-2.0" in model:
+            return "gemini/gemini-3.8-flash"
+        # If set to Claude but no Anthropic key is present, fallback to Gemini
+        if (model.startswith("anthropic/") or "claude" in model) and not os.environ.get("ANTHROPIC_API_KEY"):
+            if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+                return "gemini/gemini-3.8-flash"
+        return model
     if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
         return "gemini/gemini-3.8-flash"
     if os.environ.get("OPENAI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
