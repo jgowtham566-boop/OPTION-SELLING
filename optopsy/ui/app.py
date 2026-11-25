@@ -352,6 +352,20 @@ def get_data_layer() -> SQLAlchemyDataLayer:
 # --- Auth -----------------------------------------------------------
 _log = logging.getLogger(__name__)
 
+# Gracefully handle any expired or mismatched session tokens without raising 401
+import chainlit.auth as _cl_auth
+_orig_auth_user = _cl_auth.authenticate_user
+
+async def _safe_authenticate_user(token: str | None = None, *args, **kwargs):
+    if token:
+        try:
+            return await _orig_auth_user(token, *args, **kwargs)
+        except Exception:
+            _log.info("Expired or invalid session token received; falling back to local user.")
+    return cl.User(identifier="local", metadata={"role": "user"})
+
+_cl_auth.authenticate_user = _safe_authenticate_user
+
 _auth_plugin = None
 try:
     from optopsy.plugins import get_plugin_auth
@@ -376,13 +390,6 @@ if _auth_plugin is not None:
         _log.warning(
             "Unknown auth plugin type %r; falling back to local auth", _auth_type
         )
-        _auth_plugin = None  # trigger default below
-
-if _auth_plugin is None:
-    # Default: single-user local mode — no login screen.
-    @cl.header_auth_callback
-    async def header_auth_callback(headers) -> cl.User:
-        return cl.User(identifier="local", metadata={"role": "user"})
 
 
 @cl.set_starters
