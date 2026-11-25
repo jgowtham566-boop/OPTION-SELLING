@@ -56,16 +56,16 @@ def _resolve_model() -> str:
     """Resolve the default model based on available environment API keys."""
     model = os.environ.get("OPTOPSY_MODEL")
     if model:
-        # Automatically upgrade deprecated gemini-2.0 models to gemini-3.8-flash
-        if "gemini-2.0" in model:
-            return "gemini/gemini-3.8-flash"
+        # Automatically upgrade deprecated or overloaded models to gemini-3.5-flash
+        if "gemini-2.0" in model or "gemini-3.8" in model:
+            return "gemini/gemini-3.5-flash"
         # If set to Claude but no Anthropic key is present, fallback to Gemini
         if (model.startswith("anthropic/") or "claude" in model) and not os.environ.get("ANTHROPIC_API_KEY"):
             if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-                return "gemini/gemini-3.8-flash"
+                return "gemini/gemini-3.5-flash"
         return model
     if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-        return "gemini/gemini-3.8-flash"
+        return "gemini/gemini-3.5-flash"
     if os.environ.get("OPENAI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
         return "gpt-4o-mini"
     return "anthropic/claude-haiku-4-5-20251001"
@@ -331,7 +331,7 @@ chainlit_app.routes.insert(_insert_idx, _storage_route)
 
 # --- Health check endpoint for Railway / container orchestrators -----------
 async def _health():
-    return JSONResponse({"status": "ok", "model": _resolve_model(), "version": "3.8"})
+    return JSONResponse({"status": "ok", "model": _resolve_model(), "version": "3.5"})
 
 
 _health_route = APIRoute(path="/health", endpoint=_health, methods=["GET"])

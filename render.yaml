@@ -17,7 +17,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: OPTOPSY_MODEL
-        value: gemini/gemini-3.8-flash
+        value: gemini/gemini-3.5-flash
       - key: EODHD_API_KEY
         sync: false
       - key: FYERS_APP_ID

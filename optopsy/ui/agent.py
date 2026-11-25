@@ -502,9 +502,9 @@ class OptopsyAgent:
     """
 
     def __init__(self, model: str = "anthropic/claude-haiku-4-5-20251001"):
-        # Auto-upgrade any deprecated gemini-2.0 reference to gemini-3.8-flash
-        if "gemini-2.0" in model:
-            model = "gemini/gemini-3.8-flash"
+        # Auto-upgrade deprecated or overloaded models to gemini-3.5-flash
+        if "gemini-2.0" in model or "gemini-3.8" in model:
+            model = "gemini/gemini-3.5-flash"
         self.model = model
         self.tools = get_tool_schemas()
         # Cache tool schemas as a prefix on Anthropic models — add cache_control
@@ -667,10 +667,15 @@ class OptopsyAgent:
                         )
                     backoff = 2**_attempt  # 1s, 2s
                     await asyncio.sleep(backoff)
-                except (litellm.ServiceUnavailableError, litellm.APIConnectionError):
+                except (litellm.ServiceUnavailableError, litellm.APIConnectionError) as exc:
+                    # If high demand / service unavailable, fallback to gemini-3.5-flash if on another gemini model
+                    if "gemini" in self.model and self.model != "gemini/gemini-3.5-flash":
+                        self.model = "gemini/gemini-3.5-flash"
+                        await asyncio.sleep(1)
+                        continue
                     if _attempt == _MAX_LLM_RETRIES - 1:
                         raise RuntimeError(
-                            "LLM service is temporarily unavailable. Please try again shortly."
+                            f"LLM service is temporarily unavailable: {exc}"
                         )
                     await asyncio.sleep(2**_attempt)
 
