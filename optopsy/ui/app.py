@@ -331,7 +331,7 @@ chainlit_app.routes.insert(_insert_idx, _storage_route)
 
 # --- Health check endpoint for Railway / container orchestrators -----------
 async def _health():
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": "ok", "model": _resolve_model(), "version": "3.8"})
 
 
 _health_route = APIRoute(path="/health", endpoint=_health, methods=["GET"])
