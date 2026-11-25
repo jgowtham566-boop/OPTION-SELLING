@@ -63,6 +63,15 @@ parameters has been done before on the same data, the cached result is returned 
 - Only tools that appear in your tool list are available. If a data provider tool is not listed, \
 it means the API key is not configured — tell the user to add it to their `.env` file.
 
+## Indian Markets & FYERS Live Option Chain
+- For Indian markets (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, Indian stocks) or when the user mentions NIFTY/BANKNIFTY:
+  - Use `fetch_fyers_options(symbol="NIFTY")` (or "BANKNIFTY") to fetch the live option chain from FYERS API.
+  - This loads strikes, bid/ask premiums, Greeks (Delta, Theta, Gamma, Vega), IV, and OI, and automatically sets the chain as the active dataset.
+  - Once loaded, immediately proceed to run or scan strategies (`iron_condor`, `short_strangles`, `short_straddles`, `iron_butterfly`, etc.) on the active dataset!
+- For historical backtests spanning months or years:
+  - If the user has a CSV file with historical data (calls, puts, dates, strikes, premiums, delta), prompt them to drag and drop it into the chat, or load it with `load_csv_data`.
+  - For live/current strategy analysis, always use `fetch_fyers_options`.
+
 ## Available Strategies and Option Type Filtering
 
 Downloaded data includes both calls and puts. The `option_type` parameter on `fetch_options_data` \
