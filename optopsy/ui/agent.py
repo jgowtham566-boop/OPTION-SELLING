@@ -440,16 +440,12 @@ _COMPACT_THRESHOLD = 300
 
 
 def _sanitize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove tool messages whose tool_call_id has no matching tool_calls entry.
+    """Sanitize conversation history for LLM provider requirements.
 
-    The Anthropic API requires every ``tool_result`` block to reference a
-    ``tool_use`` block in the preceding assistant message.  When a session is
-    resumed from persisted steps, intermediate assistant messages (which carry
-    ``tool_calls``) may not have been saved, leaving orphaned tool messages
-    that trigger ``invalid_request_error``.
-
-    This function drops those orphaned tool messages so the conversation
-    history is always valid before sending to the LLM.
+    1. Removes orphaned tool messages whose tool_call_id has no matching tool_calls.
+    2. Ensures every message has non-empty content (or valid tool_calls).
+    3. Guarantees the conversation never ends with an assistant message (which Gemini
+       strictly forbids with 'Requests ending with a model turn are not supported').
     """
     valid_tc_ids: set[str] = set()
     for m in messages:
@@ -458,11 +454,28 @@ def _sanitize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
                 tc_id = tc.get("id", "")
                 if tc_id:
                     valid_tc_ids.add(tc_id)
-    return [
-        m
-        for m in messages
-        if m.get("role") != "tool" or m.get("tool_call_id") in valid_tc_ids
-    ]
+
+    cleaned: list[dict[str, Any]] = []
+    for m in messages:
+        if m.get("role") == "tool" and m.get("tool_call_id") not in valid_tc_ids:
+            continue
+
+        msg_copy = dict(m)
+        content = msg_copy.get("content")
+        if content is None or (isinstance(content, str) and not content.strip() and not msg_copy.get("tool_calls")):
+            if msg_copy.get("role") == "user":
+                msg_copy["content"] = "Please continue."
+            elif msg_copy.get("role") == "assistant":
+                continue
+
+        cleaned.append(msg_copy)
+
+    # Ensure the conversation does not end on an assistant turn
+    while cleaned and cleaned[-1].get("role") == "assistant":
+        cleaned.append({"role": "user", "content": "Please continue."})
+        break
+
+    return cleaned
 
 
 def _compact_history(messages: list[dict[str, Any]]) -> None:

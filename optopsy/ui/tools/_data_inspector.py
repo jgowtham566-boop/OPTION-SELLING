@@ -58,11 +58,41 @@ def _handle_load_csv_data(arguments, dataset, signals, datasets, results, _resul
             csv_kwargs[key] = val
 
     try:
-        df = op.csv_data(file_path, **csv_kwargs)
+        if file_path.lower().endswith(".parquet"):
+            df = pd.read_parquet(file_path)
+            col_map = {
+                "underlying": "underlying_symbol",
+                "expiry_date": "expiration",
+                "date": "quote_date",
+            }
+            for old_col, new_col in col_map.items():
+                if old_col in df.columns and new_col not in df.columns:
+                    df.rename(columns={old_col: new_col}, inplace=True)
+            if "option_type" in df.columns:
+                df["option_type"] = (
+                    df["option_type"].astype(str).str.lower().replace({"ce": "c", "pe": "p"})
+                )
+            if "close" in df.columns:
+                if "bid" not in df.columns:
+                    df["bid"] = df["close"]
+                if "ask" not in df.columns:
+                    df["ask"] = df["close"]
+                if "last" not in df.columns:
+                    df["last"] = df["close"]
+            if "delta" not in df.columns:
+                df["delta"] = df["option_type"].apply(
+                    lambda t: 0.5 if str(t).lower().startswith("c") else -0.5
+                )
+            if "expiration" in df.columns:
+                df["expiration"] = pd.to_datetime(df["expiration"])
+            if "quote_date" in df.columns:
+                df["quote_date"] = pd.to_datetime(df["quote_date"])
+        else:
+            df = op.csv_data(file_path, **csv_kwargs)
     except Exception as e:
         _log.error("load_csv_data failed for %s: %s", file_path, e)
         return _result(
-            f"Failed to load CSV '{label}': check column mapping and file format."
+            f"Failed to load data file '{label}': {e}"
         )
     updated_datasets = {**datasets, label: df}
 

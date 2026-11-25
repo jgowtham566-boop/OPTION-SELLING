@@ -745,25 +745,28 @@ async def on_message(message: cl.Message):
         cl.user_session.set("agent", agent)
         cl.user_session.set("messages", messages)
 
-    # Handle CSV file uploads via drag-and-drop.
+    # Handle CSV and Parquet file uploads via drag-and-drop.
     # We store the raw file path so the agent can inspect the headers and
-    # call csv_data() with the correct column mapping.
-    csv_elements = [
+    # call load_csv_data() with the correct column mapping.
+    data_elements = [
         el
         for el in (message.elements or [])
-        if el.name and el.name.lower().endswith(".csv") and el.path
+        if el.name and (el.name.lower().endswith(".csv") or el.name.lower().endswith(".parquet")) and el.path
     ]
     _upload_contexts: list[str] = []
-    for el in csv_elements:
+    for el in data_elements:
         try:
             if not el.path:
                 continue
-            raw = pd.read_csv(el.path, nrows=5)
+            if el.name.lower().endswith(".parquet"):
+                raw = pd.read_parquet(el.path)
+            else:
+                raw = pd.read_csv(el.path, nrows=5)
             label = el.name
             agent.uploaded_files[label] = el.path
 
             headers = list(raw.columns)
-            preview = _df_to_markdown(raw, max_rows=5)
+            preview = _df_to_markdown(raw.head(5), max_rows=5)
             await cl.Message(
                 content=(
                     f"Received **{label}** — {len(headers)} columns\n"
@@ -773,7 +776,7 @@ async def on_message(message: cl.Message):
                 )
             ).send()
             _upload_contexts.append(
-                f"[Uploaded CSV: {label} | columns ({len(headers)}): {headers}]"
+                f"[Uploaded Data File: {label} | columns ({len(headers)}): {headers}]"
             )
         except Exception as e:
             await cl.Message(content=f"Failed to read **{el.name}**: {e}").send()
@@ -782,14 +785,24 @@ async def on_message(message: cl.Message):
     # is aware of the user's preferred parameters.
     chat_settings = cl.user_session.get("chat_settings") or {}
     settings_context = _build_settings_context(chat_settings)
-    user_content = message.content
+    user_content = message.content or ""
     if _upload_contexts:
-        user_content = (
-            f"{user_content}\n\n"
-            + "\n".join(_upload_contexts)
-            + "\nPlease inspect the columns and load the CSV with the correct "
-            "column mapping using the appropriate tool."
-        )
+        if user_content.strip():
+            user_content = (
+                f"{user_content}\n\n"
+                + "\n".join(_upload_contexts)
+                + "\nPlease inspect the columns and load the dataset with the correct "
+                "column mapping using load_csv_data."
+            )
+        else:
+            user_content = (
+                "I have uploaded data files:\n"
+                + "\n".join(_upload_contexts)
+                + "\nPlease inspect the columns and load the dataset for options backtesting."
+            )
+    elif not user_content.strip():
+        user_content = "Hello, what options strategies can we analyze?"
+
     if settings_context:
         user_content = f"{user_content}\n\n{settings_context}"
     messages.append({"role": "user", "content": user_content})
