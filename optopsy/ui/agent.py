@@ -21,11 +21,13 @@ Key design decisions:
 import asyncio
 import functools
 import json
+import logging
 from typing import Any
 
 import litellm
 import pandas as pd
 
+_log = logging.getLogger(__name__)
 litellm.suppress_debug_info = True
 
 from .tools import execute_tool, get_tool_schemas
@@ -523,10 +525,10 @@ class OptopsyAgent:
     state (datasets, signals, strategy results) across conversation turns.
     """
 
-    def __init__(self, model: str = "gemini/gemini-2.5-flash"):
-        # Auto-upgrade deprecated or overloaded models to stable gemini-2.5-flash
-        if "gemini-2.0" in model or "gemini-3.8" in model or model == "gemini/gemini-3.5-flash":
-            model = "gemini/gemini-2.5-flash"
+    def __init__(self, model: str = "gemini/gemini-3.5-flash"):
+        # Auto-upgrade deprecated or invalid models to stable gemini-3.5-flash
+        if "gemini-2.0" in model or "gemini-2.5" in model or "gemini-1.5" in model:
+            model = "gemini/gemini-3.5-flash"
         self.model = model
         self.tools = get_tool_schemas()
         # Cache tool schemas as a prefix on Anthropic models — add cache_control
@@ -631,15 +633,14 @@ class OptopsyAgent:
             candidate_models = [self.model]
             if "gemini" in self.model:
                 for candidate in [
-                    "gemini/gemini-2.5-flash",
-                    "gemini/gemini-1.5-flash",
-                    "gemini/gemini-2.5-pro",
                     "gemini/gemini-3.5-flash",
+                    "gemini/gemini-3.8-flash",
+                    "gemini/gemini-flash-latest",
                 ]:
                     if candidate not in candidate_models:
                         candidate_models.append(candidate)
 
-            _MAX_LLM_RETRIES = max(4, len(candidate_models))
+            _MAX_LLM_RETRIES = max(6, len(candidate_models) * 2)
             # Disable LiteLLM internal fallback to prevent MidStreamFallbackError
             try:
                 litellm.fallbacks = None
@@ -649,7 +650,7 @@ class OptopsyAgent:
             for _attempt in range(_MAX_LLM_RETRIES):
                 content_parts = []
                 tool_calls_acc = {}
-                active_model = candidate_models[min(_attempt, len(candidate_models) - 1)]
+                active_model = candidate_models[_attempt % len(candidate_models)]
                 self.model = active_model
 
                 # Stream live tokens to UI
@@ -704,7 +705,7 @@ class OptopsyAgent:
                             "LLM rate limit exceeded after retries. "
                             "Please wait a moment and try again."
                         )
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(2.0 + _attempt * 0.5)
                 except Exception as exc:
                     exc_str = str(exc).lower()
                     is_transient = any(
@@ -718,17 +719,23 @@ class OptopsyAgent:
                             "timeout",
                             "resource_exhausted",
                             "unavailable",
+                            "timed out",
+                            "429",
                         ]
                     )
                     if is_transient and _attempt < _MAX_LLM_RETRIES - 1:
-                        next_model = candidate_models[min(_attempt + 1, len(candidate_models) - 1)]
+                        next_model = candidate_models[(_attempt + 1) % len(candidate_models)]
+                        sleep_time = 2.0 + _attempt * 0.5
                         _log.warning(
-                            "Model %s failed with %s; switching to fallback model %s",
+                            "Model %s encountered transient issue (%s); sleeping %.1fs and trying %s (attempt %d/%d)",
                             active_model,
                             exc,
+                            sleep_time,
                             next_model,
+                            _attempt + 1,
+                            _MAX_LLM_RETRIES,
                         )
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(sleep_time)
                         continue
                     if _attempt == _MAX_LLM_RETRIES - 1:
                         raise RuntimeError(
