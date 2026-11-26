@@ -523,10 +523,10 @@ class OptopsyAgent:
     state (datasets, signals, strategy results) across conversation turns.
     """
 
-    def __init__(self, model: str = "anthropic/claude-haiku-4-5-20251001"):
-        # Auto-upgrade deprecated or overloaded models to gemini-3.5-flash
-        if "gemini-2.0" in model or "gemini-3.8" in model:
-            model = "gemini/gemini-3.5-flash"
+    def __init__(self, model: str = "gemini/gemini-2.5-flash"):
+        # Auto-upgrade deprecated or overloaded models to stable gemini-2.5-flash
+        if "gemini-2.0" in model or "gemini-3.8" in model or model == "gemini/gemini-3.5-flash":
+            model = "gemini/gemini-2.5-flash"
         self.model = model
         self.tools = get_tool_schemas()
         # Cache tool schemas as a prefix on Anthropic models — add cache_control
@@ -627,14 +627,32 @@ class OptopsyAgent:
             # tool_calls_acc: index -> {id, name, arguments_chunks}
             tool_calls_acc: dict[int, dict[str, Any]] = {}
 
-            _MAX_LLM_RETRIES = 3
+            # Resilient candidate models for Gemini when high demand / 503 spikes occur
+            candidate_models = [self.model]
+            if "gemini" in self.model:
+                for candidate in [
+                    "gemini/gemini-2.5-flash",
+                    "gemini/gemini-1.5-flash",
+                    "gemini/gemini-2.5-pro",
+                    "gemini/gemini-3.5-flash",
+                ]:
+                    if candidate not in candidate_models:
+                        candidate_models.append(candidate)
+
+            _MAX_LLM_RETRIES = max(4, len(candidate_models))
+            # Disable LiteLLM internal fallback to prevent MidStreamFallbackError
+            try:
+                litellm.fallbacks = None
+            except Exception:
+                pass
+
             for _attempt in range(_MAX_LLM_RETRIES):
                 content_parts = []
                 tool_calls_acc = {}
-                # On the first attempt stream tokens live to on_thinking_token
-                # (intermediate reasoning).  We don't yet know if this is a
-                # final turn — that's determined only after the stream ends.
-                # On retries, collect silently to avoid garbled partial output.
+                active_model = candidate_models[min(_attempt, len(candidate_models) - 1)]
+                self.model = active_model
+
+                # Stream live tokens to UI
                 live_token_cb = on_thinking_token if _attempt == 0 else None
                 try:
                     stream = await litellm.acompletion(
@@ -678,28 +696,45 @@ class OptopsyAgent:
                 except litellm.AuthenticationError:
                     raise RuntimeError(
                         "No API key configured. Add your LLM provider key "
-                        "(e.g. `OPENAI_API_KEY`) to a `.env` file in this directory."
+                        "(e.g. `GEMINI_API_KEY`) to your environment variables."
                     )
                 except litellm.RateLimitError:
                     if _attempt == _MAX_LLM_RETRIES - 1:
                         raise RuntimeError(
                             "LLM rate limit exceeded after retries. "
-                            "Wait a moment and try again, or switch to a model "
-                            "with higher rate limits."
+                            "Please wait a moment and try again."
                         )
-                    backoff = 2**_attempt  # 1s, 2s
-                    await asyncio.sleep(backoff)
-                except (litellm.ServiceUnavailableError, litellm.APIConnectionError) as exc:
-                    # If high demand / service unavailable, fallback to gemini-3.5-flash if on another gemini model
-                    if "gemini" in self.model and self.model != "gemini/gemini-3.5-flash":
-                        self.model = "gemini/gemini-3.5-flash"
+                    await asyncio.sleep(1.5)
+                except Exception as exc:
+                    exc_str = str(exc).lower()
+                    is_transient = any(
+                        err_key in exc_str
+                        for err_key in [
+                            "503",
+                            "high demand",
+                            "midstreamfallbackerror",
+                            "serviceunavailable",
+                            "connection",
+                            "timeout",
+                            "resource_exhausted",
+                            "unavailable",
+                        ]
+                    )
+                    if is_transient and _attempt < _MAX_LLM_RETRIES - 1:
+                        next_model = candidate_models[min(_attempt + 1, len(candidate_models) - 1)]
+                        _log.warning(
+                            "Model %s failed with %s; switching to fallback model %s",
+                            active_model,
+                            exc,
+                            next_model,
+                        )
                         await asyncio.sleep(1)
                         continue
                     if _attempt == _MAX_LLM_RETRIES - 1:
                         raise RuntimeError(
                             f"LLM service is temporarily unavailable: {exc}"
                         )
-                    await asyncio.sleep(2**_attempt)
+                    raise
 
             content = "".join(content_parts)
             tool_calls_list = [
