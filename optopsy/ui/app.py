@@ -59,22 +59,22 @@ def _resolve_model() -> str:
     """Resolve the default model based on available environment API keys."""
     model = os.environ.get("OPTOPSY_MODEL")
     if model:
-        # Automatically upgrade deprecated models to stable gemini-3.5-flash
-        if "gemini-2.0" in model or "gemini-2.5" in model or "gemini-1.5" in model:
-            return "gemini/gemini-3.5-flash"
+        # Automatically upgrade deprecated or overloaded models
+        if "gemini-2.0" in model or "gemini-2.5" in model or "gemini-1.5" in model or model == "gemini/gemini-3.5-flash":
+            return "gemini/gemini-flash-lite-latest"
         # If set to Claude but no Anthropic key is present, fallback to Gemini
         if (model.startswith("anthropic/") or "claude" in model) and not os.environ.get("ANTHROPIC_API_KEY"):
             if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-                return "gemini/gemini-3.5-flash"
+                return "gemini/gemini-flash-lite-latest"
         return model
     if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-        return "gemini/gemini-3.5-flash"
+        return "gemini/gemini-flash-lite-latest"
     if os.environ.get("OPENAI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
         return "gpt-4o-mini"
-    return "gemini/gemini-3.5-flash"
+    return "gemini/gemini-flash-lite-latest"
 
 
-_DEFAULT_MODEL = "gemini/gemini-3.5-flash"
+_DEFAULT_MODEL = "gemini/gemini-flash-lite-latest"
 
 _RESULT_TOOLS = frozenset({"run_strategy", "scan_strategies"})
 
@@ -334,7 +334,7 @@ chainlit_app.routes.insert(_insert_idx, _storage_route)
 
 # --- Health check endpoint for Railway / container orchestrators -----------
 async def _health():
-    return JSONResponse({"status": "ok", "model": _resolve_model(), "version": "3.5"})
+    return JSONResponse({"status": "ok", "model": _resolve_model(), "version": "flash-lite"})
 
 
 _health_route = APIRoute(path="/health", endpoint=_health, methods=["GET"])

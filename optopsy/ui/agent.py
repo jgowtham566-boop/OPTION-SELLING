@@ -525,10 +525,10 @@ class OptopsyAgent:
     state (datasets, signals, strategy results) across conversation turns.
     """
 
-    def __init__(self, model: str = "gemini/gemini-3.5-flash"):
-        # Auto-upgrade deprecated or invalid models to stable gemini-3.5-flash
-        if "gemini-2.0" in model or "gemini-2.5" in model or "gemini-1.5" in model:
-            model = "gemini/gemini-3.5-flash"
+    def __init__(self, model: str = "gemini/gemini-flash-lite-latest"):
+        # Auto-upgrade deprecated or overloaded models to ultra-reliable gemini-flash-lite-latest
+        if "gemini-2.0" in model or "gemini-2.5" in model or "gemini-1.5" in model or model == "gemini/gemini-3.5-flash":
+            model = "gemini/gemini-flash-lite-latest"
         self.model = model
         self.tools = get_tool_schemas()
         # Cache tool schemas as a prefix on Anthropic models — add cache_control
@@ -633,9 +633,10 @@ class OptopsyAgent:
             candidate_models = [self.model]
             if "gemini" in self.model:
                 for candidate in [
+                    "gemini/gemini-flash-lite-latest",
+                    "gemini/gemini-3.5-flash-lite",
                     "gemini/gemini-3.5-flash",
                     "gemini/gemini-3.8-flash",
-                    "gemini/gemini-flash-latest",
                 ]:
                     if candidate not in candidate_models:
                         candidate_models.append(candidate)
