@@ -194,6 +194,22 @@ class FyersProvider(DataProvider):
             )
         return f"Unknown tool: {tool_name}", None
 
+    def _auth_expired_message(self) -> str:
+        app_id = os.environ.get("FYERS_APP_ID", "GOHBCRZYVM-100").strip()
+        auth_url = (
+            f"https://api-t1.fyers.in/api/v3/generate-authcode?"
+            f"client_id={app_id}&redirect_uri=https%3A%2F%2Ftrade.fyers.in%2Fapi-login%2Fredirect-uri%2Findex.html"
+            f"&response_type=code&state=sample_state"
+        )
+        return (
+            f"⚠️ **FYERS Access Token Expired (HTTP 401)**\n\n"
+            f"Per FYERS/SEBI security rules, broker session tokens expire daily at 6:00 AM IST.\n\n"
+            f"👉 **To renew in 1 click:**\n"
+            f"1. Open authorization URL: [{auth_url}]({auth_url})\n"
+            f"2. Log in with your FYERS PIN/OTP to approve the app.\n"
+            f"3. Copy the `auth_code` from the redirect page URL and send it here to activate today's token."
+        )
+
     def _fetch_options_chain(
         self, symbol: str, strikecount: int = 15, expiry: str | None = None
     ) -> tuple[str, pd.DataFrame | None]:
@@ -217,6 +233,8 @@ class FyersProvider(DataProvider):
         try:
             resp = self._session.get(_OPTIONS_CHAIN_URL, headers=headers, params=params, timeout=20)
             if resp.status_code != 200:
+                if resp.status_code == 401 or "valid token" in resp.text:
+                    return self._auth_expired_message(), None
                 return f"FYERS API error (HTTP {resp.status_code}): {resp.text}", None
 
             res_json = resp.json()
@@ -334,6 +352,8 @@ class FyersProvider(DataProvider):
         try:
             resp = self._session.get(_QUOTES_URL, headers=headers, params=params, timeout=15)
             if resp.status_code != 200:
+                if resp.status_code == 401 or "valid token" in resp.text:
+                    return self._auth_expired_message(), None
                 return f"FYERS Quotes API error (HTTP {resp.status_code}): {resp.text}", None
 
             res_json = resp.json()
@@ -382,6 +402,8 @@ class FyersProvider(DataProvider):
         try:
             resp = self._session.get(_HISTORY_URL, headers=headers, params=params, timeout=20)
             if resp.status_code != 200:
+                if resp.status_code == 401 or "valid token" in resp.text:
+                    return self._auth_expired_message(), None
                 return f"FYERS History API error: {resp.text}", None
 
             res_json = resp.json()
